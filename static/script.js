@@ -177,6 +177,7 @@ function collectFormData() {
         unit: formData.get('unit'),
         problemType: formData.get('problemType'),
         count: formData.get('count'),
+        difficulty: formData.get('difficulty'),
         options: {}
     };
     

@@ -11,34 +11,29 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from datetime import datetime
 import tempfile
-from dotenv import load_dotenv 
+from dotenv import load_dotenv
 
 # .envファイルから環境変数を読み込む
-load_dotenv() 
+load_dotenv()
 
 app = Flask(__name__)
 
-# 環境変数からAPIキーを取得
+# Gemini API設定
 api_key = os.environ.get('GEMINI_API_KEY')
 if not api_key:
-    # APIキーがない場合はエラーを発生させてサーバーを停止させる
     raise ValueError("エラー: 環境変数に GEMINI_API_KEY が設定されていません。")
 
 genai.configure(api_key=api_key)
-# 利用可能なモデル名を指定
 model = genai.GenerativeModel('gemini-2.5-flash')
-# --- ここまで ---
 
-# --- ★ 変更点: 日本語フォントの設定を修正 ---
+# 日本語フォントの設定
 try:
-    # プロジェクト内に配置したフォントファイル名を指定
     pdfmetrics.registerFont(TTFont('NotoSansCJK', 'NotoSansJP-Regular.ttf'))
     FONT_NAME = 'NotoSansCJK'
 except Exception as e:
     print(f"フォント読み込みエラー: {e}")
     print("日本語フォントが読み込めないため、英語フォント(Helvetica)にフォールバックします。文字化けする可能性があります。")
     FONT_NAME = 'Helvetica'
-# --- ここまで ---
 
 class ProblemGenerator:
     def __init__(self):
@@ -65,17 +60,14 @@ class ProblemGenerator:
             }
         }
 
-    # --- ★ 変更点: generate_problems メソッドを修正 ---
-    def generate_problems(self, subject, grade, unit, problem_type, count, options=None):
+    def generate_problems(self, subject, grade, unit, problem_type, count, difficulty, options=None):
         """AIを使って問題を生成"""
         
-        # プロンプトの構築
         if subject == 'math':
-            prompt = self._build_math_prompt(grade, unit, problem_type, count, options)
+            prompt = self._build_math_prompt(grade, unit, problem_type, count, difficulty, options)
         else:
-            prompt = self._build_english_prompt(grade, unit, problem_type, count, options)
+            prompt = self._build_english_prompt(grade, unit, problem_type, count, difficulty, options)
         
-        # GeminiにJSON形式での応答を強制する設定
         generation_config = genai.types.GenerationConfig(
             response_mime_type="application/json"
         )
@@ -85,17 +77,14 @@ class ProblemGenerator:
                 prompt,
                 generation_config=generation_config
             )
-            # レスポンスがJSON形式であることが保証されるため、パースが簡単になる
             problems_data = json.loads(response.text)
             return problems_data
         except Exception as e:
-            # デバッグしやすいように、エラーの型と内容を詳しく出力
             print(f"AI生成エラー ({type(e).__name__}): {e}")
             return self._generate_fallback_problems(subject, grade, unit, count)
-    # --- ここまで ---
 
-    def _build_math_prompt(self, grade, unit, problem_type, count, options):
-        # (このメソッドは変更なし)
+    def _build_math_prompt(self, grade, unit, problem_type, count, difficulty, options):
+        """数学問題生成用プロンプト"""
         base_prompt = f"""
 {grade}の数学「{unit}」に関する{problem_type}を{count}問作成してください。
 
@@ -113,7 +102,7 @@ class ProblemGenerator:
 }}
 
 要件：
-- 問題は{grade}のレベルに適した難易度にする
+- 問題は{grade}のレベルに適した、難易度「{difficulty}」で作成すること
 - 解説は生徒が理解しやすいよう詳しく書く
 - 計算過程も含める
 - "choices"は{problem_type}が「選択問題」の場合のみ含めること。それ以外の場合はnullではなくキー自体を省略すること。
@@ -126,8 +115,8 @@ class ProblemGenerator:
             
         return base_prompt
 
-    def _build_english_prompt(self, grade, unit, problem_type, count, options):
-        # (このメソッドは変更なし)
+    def _build_english_prompt(self, grade, unit, problem_type, count, difficulty, options):
+        """英語問題生成用プロンプト"""
         base_prompt = f"""
 {grade}の英語「{unit}」に関する{problem_type}を{count}問作成してください。
 
@@ -145,9 +134,10 @@ class ProblemGenerator:
 }}
 
 要件：
-- 問題は{grade}のレベルに適した語彙・文法を使用
+- 問題は{grade}のレベルに適した語彙・文法を使用し、難易度は「{difficulty}」とすること
 - 解説では文法ポイントも詳しく説明
 - 実用的な例文を使用
+- 解答解説は「ですます調」ではなく「である調」で書くこと
 - "choices"は{problem_type}が「選択問題」の場合のみ含めること。それ以外の場合はnullではなくキー自体を省略すること。
 """
         
@@ -156,11 +146,8 @@ class ProblemGenerator:
             
         return base_prompt
 
-    # ★★★ このメソッドは不要になったため削除 ★★★
-    # def _parse_ai_response(self, response_text): ...
-
     def _generate_fallback_problems(self, subject, grade, unit, count):
-        # (このメソッドは変更なし)
+        """AIが使えない場合の代替問題生成"""
         problems = []
         for i in range(min(count, 3)):
             if subject == 'math':
@@ -182,12 +169,10 @@ class ProblemGenerator:
         return {"problems": problems}
 
     def get_units_for_grade(self, subject, grade):
-        # (このメソッドは変更なし)
+        """学年に応じた単元リストを取得"""
         return self.subject_templates.get(subject, {}).get('units', {}).get(grade, [])
-    
-# ...
+
 class PDFGenerator:
-    # (変更なし)
     def __init__(self):
         self.styles = getSampleStyleSheet()
         self.setup_styles()
@@ -268,6 +253,7 @@ def generate_problems():
             unit=data.get('unit'),
             problem_type=data.get('problemType'),
             count=int(data.get('count', 5)),
+            difficulty=data.get('difficulty', '標準'),
             options=data.get('options')
         )
         return jsonify(problems)

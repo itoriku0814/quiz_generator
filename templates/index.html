@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>オーダーメイド問題プリントジェネレーター</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>プリントジェネレーター</h1>
+            <p class="subtitle">AIが瞬時に問題と解答のプリントを作成します</p>
+        </header>
+
+        <main class="main-content">
+            <!-- 設定フォーム -->
+            <section class="form-section">
+                <h2>📝 問題生成設定</h2>
+                <form id="problemForm" class="problem-form">
+                    <!-- 科目選択 -->
+                    <div class="form-group">
+                        <label for="subject">科目</label>
+                        <select id="subject" name="subject" required>
+                            <option value="">選択してください</option>
+                            <option value="math">数学</option>
+                            <option value="english">英語</option>
+                        </select>
+                    </div>
+
+                    <!-- 学年選択 -->
+                    <div class="form-group">
+                        <label for="grade">学年・レベル</label>
+                        <select id="grade" name="grade" required>
+                            <option value="">科目を先に選択してください</option>
+                        </select>
+                    </div>
+
+                    <!-- 単元選択 -->
+                    <div class="form-group">
+                        <label for="unit">単元・トピック</label>
+                        <select id="unit" name="unit" required>
+                            <option value="">学年を先に選択してください</option>
+                        </select>
+                    </div>
+
+                    <!-- 問題形式 -->
+                    <div class="form-group">
+                        <label for="problemType">問題形式</label>
+                        <select id="problemType" name="problemType" required>
+                            <option value="選択問題">選択問題</option>
+                            <option value="穴埋め問題">穴埋め問題</option>
+                            <option value="記述問題">記述問題</option>
+                        </select>
+                    </div>
+
+                    <!-- 問題数 -->
+                    <div class="form-group">
+                        <label for="count">問題数</label>
+                        <select id="count" name="count">
+                            <option value="5">5問</option>
+                            <option value="10" selected>10問</option>
+                            <option value="15">15問</option>
+                            <option value="20">20問</option>
+                        </select>
+                    </div>
+
+                    <!-- 詳細オプション -->
+                    <div class="form-group">
+                        <label>詳細オプション</label>
+                        <div class="checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="calculationOnly" name="calculationOnly">
+                                <span class="checkmark"></span>
+                                計算問題のみ
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="wordProblems" name="wordProblems">
+                                <span class="checkmark"></span>
+                                文章問題を含める
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- 英語専用：単語リスト -->
+                    <div class="form-group" id="vocabularyGroup" style="display: none;">
+                        <label for="vocabularyList">特定の英単語リスト（カンマ区切り）</label>
+                        <textarea id="vocabularyList" name="vocabularyList" placeholder="例: apple, book, study, happy"></textarea>
+                    </div>
+
+                    <!-- 生成ボタン -->
+                    <div class="button-group">
+                        <button type="submit" id="generateBtn" class="btn btn-primary">
+                            ✨ 問題を生成する
+                        </button>
+                    </div>
+                </form>
+            </section>
+
+            <!-- 生成中のローディング -->
+            <section id="loadingSection" class="loading-section" style="display: none;">
+                <div class="loading-spinner"></div>
+                <p>AIが問題を生成中です...</p>
+            </section>
+
+            <!-- プレビューセクション -->
+            <section id="previewSection" class="preview-section" style="display: none;">
+                <h2>🔍 生成された問題のプレビュー</h2>
+                <div id="problemsPreview" class="problems-preview"></div>
+                
+                <div class="preview-actions">
+                    <button id="editBtn" class="btn btn-secondary">
+                        ✏️ 問題を編集
+                    </button>
+                    <button id="regenerateBtn" class="btn btn-secondary">
+                        🔄 再生成
+                    </button>
+                    <button id="downloadBtn" class="btn btn-success">
+                        📥 PDFダウンロード
+                    </button>
+                </div>
+            </section>
+
+            <!-- 編集モーダル -->
+            <div id="editModal" class="modal" style="display: none;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>問題編集</h3>
+                        <button class="close-btn" id="closeModal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="editableProblems"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button id="saveEditsBtn" class="btn btn-primary">保存</button>
+                        <button id="cancelEditsBtn" class="btn btn-secondary">キャンセル</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <p>&copy; 2024 問題プリントジェネレーター - 塾講師業務効率化ツール</p>
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

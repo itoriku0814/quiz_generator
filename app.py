@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, jsonify, send_file
 import google.generativeai as genai
 import json
 import os
-import re  # 正規表現モジュールをインポート
+import re 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
@@ -25,7 +25,6 @@ if not api_key:
     raise ValueError("エラー: 環境変数に GEMINI_API_KEY が設定されていません。")
 
 genai.configure(api_key=api_key)
-# ▼▼▼ ユーザーの指定通り、モデル名を 'gemini-2.5-flash' に設定 ▼▼▼
 model = genai.GenerativeModel('gemini-2.5-flash')
 
 # 日本語フォントの設定
@@ -46,7 +45,7 @@ class ProblemGenerator:
                     '中学2年': ['式の計算', '連立方程式', '一次関数', '図形の性質', '確率'],
                     '中学3年': ['展開と因数分解', '平方根', '二次方程式', '二次関数', '相似', '円', '三平方の定理', '標本調査'],
                     '数学ⅠA': ['数と式', '集合と論証', '二次関数', '図形と計量', 'データの分析', '場合の数と確率', '整数の性質', '平面図形と空間図形'],
-                    '数学ⅡB': ['式と証明', '複素数と方程式', '三角関数', '指数・対数関数', '微分法', '積分法', '数列', '確率分布'],
+                    '数学ⅡB': ['式と証明', '複素数と方程式', '図形と方程式', '三角関数', '指数・対数関数', '微分法', '積分法', '数列', '確率分布'],
                     '数学ⅢC': ['分数関数と無理関数', '極限', '微分法', '微分法の応用', '積分法', '積分法の応用', 'ベクトル', '複素数平面', '二次曲線']
                 }
             },
@@ -68,10 +67,11 @@ class ProblemGenerator:
                         '接続詞',
                         '強調・倒置・挿入・省略', 
                         '一致・話法', 
-                        '否定', 
+                        '否定構文',
+                        '名詞構文' ,
                         '文法総合'
                         ],
-                    '高校英語長文': ['文化', '日常生活', '自然', '科学・技術', '社会', '産業']
+                    '高校英語長文': ['文化', '日常生活', '自然', '科学・技術', '社会', '産業', '歴史', '環境', '教育', '健康', '国際問題']
                 }
             }
         }
@@ -104,12 +104,13 @@ class ProblemGenerator:
     def generate_problems(self, subject, grade, unit, problem_type, count, difficulty, options=None):
         """AIを使って問題を生成"""
         
-        # ▼▼▼ 条件分岐を修正 ▼▼▼
         if grade == '高校英語長文':
-            prompt = self._build_english_reading_prompt(grade, unit, count, difficulty)
+            # 「高校英語長文」用のプロンプト関数を呼び出すように修正
+            prompt = self._build_english_reading_prompt(grade, unit, problem_type, count, difficulty)
         elif subject == 'math':
             prompt = self._build_math_prompt(grade, unit, problem_type, count, difficulty, options)
         else:
+            # 「高校英文法」など、上記以外の英語の問題
             prompt = self._build_english_prompt(grade, unit, problem_type, count, difficulty, options)
         
         generation_config = genai.types.GenerationConfig(
@@ -136,13 +137,21 @@ class ProblemGenerator:
             return self._generate_fallback_problems(subject, grade, unit, count)
 
     # ▼▼▼ 長文読解用プロンプト生成関数 ▼▼▼
-    def _build_english_reading_prompt(self, grade, unit, count, difficulty):
+    # ▼▼▼ 関数の引数に problem_type を追加 ▼▼▼
+    def _build_english_reading_prompt(self, grade, unit, problem_type, count, difficulty, paragraph_count=None):
         """高校英語長文問題生成用プロンプト"""
-        return f"""
-高校生レベルの英語長文を1つ生成してください。長文のトピックは「{unit}」に関連するものとします。
-その後、その長文の内容に関する問題を{count}問作成してください。
 
-難易度は「{difficulty}」で、問題形式は内容理解を問う選択式や記述式などをバランス良く含めてください。
+        # ▼▼▼ 指示文を動的に生成するロジックを追加 ▼▼▼
+        if problem_type == "おまかせ (ミックス)":
+            task_instruction = f"そして、その長文の内容に関する問題を、選択問題、穴埋め問題、記述問題をバランス良く組み合わせて合計{count}問作成してください。"
+        else:
+            task_instruction = f"そして、その長文の内容に関する{problem_type}を{count}問作成してください。"
+
+        return f"""
+高校生レベルの英語長文を1つ、{paragraph_count}段落構成で生成してください。長文のトピックは「{unit}」に関連するものとします。
+{task_instruction}
+
+難易度は「{difficulty}」でお願いします。
 
 以下の形式でJSONで回答してください：
 {{
@@ -160,6 +169,9 @@ class ProblemGenerator:
 
 要件：
 - 長文は{grade}のレベルに適した語彙・文法を使用すること。
+- 1個の問題の中に2つ以上の要素を含めないこと。
+- 段落ごとの文章量は、平均して100-150語程度とすること。
+- 全て同じようなジャンルの問題にはしないこと。
 - `questions`配列には、必ず{count}個の問題オブジェクトを含めること。
 - 設問は長文の内容に関するものにすること。
 - "choices"は選択問題の場合のみ含めること。
@@ -171,12 +183,12 @@ class ProblemGenerator:
         """数学問題生成用プロンプト"""
 
         if problem_type == "おまかせ (ミックス)":
-            task_instruction = f"{grade}の数学「{unit}」に関する問題を、選択問題、穴埋め問題、記述問題をバランス良く組み合わせて合計{count}問作成してください。"
+            instruction = f"{grade}の数学「{unit}」に関する問題を、選択問題、穴埋め問題、記述問題をバランス良く組み合わせて合計{count}問作成してください。"
         else:
-            task_instruction = f"{grade}の数学「{unit}」に関する{problem_type}を{count}問作成してください。"
+            instruction = f"{grade}の数学「{unit}」に関する{problem_type}を{count}問作成してください。"
 
         base_prompt = f"""
-    {task_instruction}
+    {instruction}
 
 以下の形式でJSONで回答してください：
 {{
@@ -221,9 +233,16 @@ class ProblemGenerator:
         return base_prompt
 
     def _build_english_prompt(self, grade, unit, problem_type, count, difficulty, options):
-        """英語問題生成用プロンプト"""
+        """英文法問題生成用プロンプト"""
+
+        # ▼▼▼ 指示文を動的に生成するロジックを追加 ▼▼▼
+        if problem_type == "おまかせ (ミックス)":
+            task_instruction = f"{grade}の英語「{unit}」に関する問題を、選択問題、穴埋め問題、記述問題をバランス良く組み合わせて合計{count}問作成してください。"
+        else:
+            task_instruction = f"{grade}の英語「{unit}」に関する{problem_type}を{count}問作成してください。"
+
         base_prompt = f"""
-{grade}の英語「{unit}」に関する{problem_type}を{count}問作成してください。
+{task_instruction}
 
 以下の形式でJSONで回答してください：
 {{
@@ -243,7 +262,7 @@ class ProblemGenerator:
 - 解説では文法ポイントも詳しく説明
 - 実用的な例文を使用
 - 全て同じようなジャンルの問題にはしないこと。
-- 問題文は日本語で書くこと
+- 問題文は日本語にすること。
 - "choices"は{problem_type}が「選択問題」の場合のみ含めること。それ以外の場合はnullではなくキー自体を省略すること。
 - JSON文字列内にバックスラッシュ(`\\`)を含める場合は、必ず二重バックスラッシュ(`\\\\`)としてエスケープすること。
 - 解答解説は「ですます調」ではなく、簡潔な「である調」で記述すること。

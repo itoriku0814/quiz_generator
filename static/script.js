@@ -40,7 +40,9 @@ const elements = {
     editableProblems: document.getElementById('editableProblems'),
     closeModal: document.getElementById('closeModal'),
     saveEditsBtn: document.getElementById('saveEditsBtn'),
-    cancelEditsBtn: document.getElementById('cancelEditsBtn')
+    cancelEditsBtn: document.getElementById('cancelEditsBtn'),
+    paragraphCountGroup: document.getElementById('paragraphCountGroup'),
+    generateBtn: document.getElementById('generateBtn'),
 };
 
 // 学年オプション
@@ -54,6 +56,16 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeEventListeners();
     updateVocabularyVisibility();
 });
+
+// 段落数選択の表示/非表示を切り替える関数
+function updateParagraphCountVisibility() {
+    const grade = elements.gradeSelect.value;
+    if (grade === '高校英語長文') {
+        elements.paragraphCountGroup.style.display = 'block';
+    } else {
+        elements.paragraphCountGroup.style.display = 'none';
+    }
+}
 
 // イベントリスナーの設定
 function initializeEventListeners() {
@@ -117,11 +129,14 @@ async function handleGradeChange() {
     const subject = elements.subjectSelect.value;
     const grade = elements.gradeSelect.value;
     
+    updateParagraphCountVisibility(); // 学年が変わるたびに呼び出す
+
     if (subject && grade) {
         await updateUnitOptions(subject, grade);
     } else {
         resetUnitSelect();
     }
+
 }
 
 // 単元オプション更新
@@ -180,6 +195,11 @@ function collectFormData() {
         difficulty: formData.get('difficulty'),
         options: {}
     };
+
+    // 「高校英語長文」が選択されている場合のみ、段落数をデータに含める
+    if (data.grade === '高校英語長文') {
+        data.paragraphCount = formData.get('paragraphCount');
+    }
     
     // チェックボックスオプション
     if (formData.get('calculationOnly')) {

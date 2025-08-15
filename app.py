@@ -105,8 +105,16 @@ class ProblemGenerator:
         """AIを使って問題を生成"""
         
         if grade == '高校英語長文':
-            # 「高校英語長文」用のプロンプト関数を呼び出すように修正
-            prompt = self._build_english_reading_prompt(grade, unit, problem_type, count, difficulty)
+            # optionsからparagraph_countを取得、デフォルトは3
+            paragraph_count = options.get('paragraphCount', 3) if options else 3
+            prompt = self._build_english_reading_prompt(
+                grade=grade,
+                unit=unit,
+                problem_type=problem_type,
+                count=count,
+                difficulty=difficulty,
+                paragraph_count=paragraph_count  # ここで段落数を渡す
+            )
         elif subject == 'math':
             prompt = self._build_math_prompt(grade, unit, problem_type, count, difficulty, options)
         else:
@@ -148,7 +156,10 @@ class ProblemGenerator:
             task_instruction = f"そして、その長文の内容に関する{problem_type}を{count}問作成してください。"
 
         return f"""
-高校生レベルの英語長文を1つ、{paragraph_count}段落構成で生成してください。長文のトピックは「{unit}」に関連するものとします。
+高校生レベルの英語長文を1つ、厳密に{paragraph_count}段落で生成してください。
+【重要】必ず{paragraph_count}段落で構成し、各段落は明確に分けてください。
+長文のトピックは「{unit}」に関連するものとします。
+
 {task_instruction}
 
 難易度は「{difficulty}」でお願いします。
@@ -168,10 +179,11 @@ class ProblemGenerator:
 }}
 
 要件：
-- 長文は{grade}のレベルに適した語彙・文法を使用すること。
+- 長文は{difficulty}, {grade}のレベルに適した語彙・文法を使用すること。
+- 段落は必ず{paragraph_count}段落で構成すること。
 - 記述問題の場合、簡潔に答えられる問題にすること。
 - 1個の問題の中に2つ以上の要素を含めないこと。
-- 段落ごとの文章量は、平均して100-150語程度とすること。
+- 段落ごとの文章量は、平均して100-120語程度とすること。
 - 全て同じようなジャンルの問題にはしないこと。
 - `questions`配列には、必ず{count}個の問題オブジェクトを含めること。
 - 設問は長文の内容に関するものにすること。
@@ -209,18 +221,20 @@ class ProblemGenerator:
 - 解説は生徒が理解しやすいよう詳しく書く
 - 計算過程も含める
 - "choices"は{problem_type}が「選択問題」の場合のみ含めること。それ以外の場合はnullではなくキー自体を省略すること。
-- 【最重要ルール】JSONの仕様を厳格に遵守してください。JSON文字列内でバックスラッシュ(`\\`)を1つだけ使用することは絶対に許されません。
-- LaTeX記法などでバックスラッシュを使う場合は、必ずそれ自体をエスケープした二重バックスラッシュ(`\\\\`)を使用してください。
-- 正しい例: `{{"formula": "\\\\sqrt{{2}}"}}`
-- 間違った例: `{{"formula": "\\sqrt{{2}}"}}` (この形式だとJSONエラーになります)
+- 【最重要ルール】JSONの仕様を厳格に遵守すること。JSON文字列内でバックスラッシュ(`\\`)を1つだけ使用することは絶対に禁止。
 - 解答解説は「ですます調」ではなく、簡潔な「である調」で記述すること。
-- 解説は、要点を押さえて、可能な限り簡潔に記述すること。計算過程は主要なステップのみを示すこと。
+- 解説は、要点を押さえて、簡潔に記述すること。計算過程は主要なステップのみを示すこと。
 - pi, theta, sigma, alpha, betaなどの英語はそれぞれの記号（π, θ, Σ, α, β）を使用すること。
 - _barはバー（上線）を意味するので、例えば「x_bar」は「x_」と表記すること。
 - sqrtは平方根を意味するので、例えば「sqrt(2)」は「√2」と表記すること。
+- ネイピア数は「e」と表記すること。expの使用は禁止。
 - べき乗は「^」は使用せず、例えば「x^2」は「x²」と表記すること。
+- {unit}が積分法の場合、不定積分と定積分の計算問題のみを出題すること。面積や体積の問題は出題禁止。
+- 三角関数の積分問題を出題する場合は、逆関数（arcsinなど）を扱う問題は出題禁止。
+- 数学ⅡBと数学ⅢCの積分法の定積分の表記方法は、必ず「∫[a→b]f(x) dx」の形式で記述すること。
+- 自然対数は必ず「log(x)」と表記すること。
 - 数式はLaTeX記法 (例: \\( ... \\) や $...$) を一切使わず、プレーンテキストと一般的な記号(+, -, *, /, ^)のみで表現すること。
-- 「*」は使わないこと
+- 「*」、「\」は使わないこと
 """
         
         if grade == "数学ⅡB" and unit in ["微分法", "積分法"]:

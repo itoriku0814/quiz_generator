@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, jsonify, send_file
 import google.generativeai as genai
 import json
 import os
+import re  # 正規表現モジュールをインポート
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
@@ -60,6 +61,35 @@ class ProblemGenerator:
             }
         }
 
+    def _fix_json_escapes(self, json_string: str) -> str:
+        """
+        AIが生成したJSON文字列内の、あらゆる不正なバックスラッシュを修正する。
+        """
+        # 保護すべき有効なエスケープシーケンスを一時的にプレースホルダーに置き換える
+        valid_escapes = {
+            '\\n': '__NEWLINE__',
+            '\\"': '__QUOTE__',
+            '\\\\': '__BACKSLASH__',
+            '\\/': '__SLASH__',
+            '\\b': '__BACKSPACE__',
+            '\\f': '__FORMFEED__',
+            '\\r': '__CARRIAGERETURN__',
+            '\\t': '__TAB__',
+        }
+        for original, placeholder in valid_escapes.items():
+            json_string = json_string.replace(original, placeholder)
+        
+        # 保護されていない、残りの不正なバックスラッシュを全て修正する
+        # （例： `\(` は `\\(` になる）
+        json_string = json_string.replace('\\', '\\\\')
+        
+        # 保護していたプレースホルダーを元の有効なエスケープシーケンスに戻す
+        for original, placeholder in valid_escapes.items():
+            json_string = json_string.replace(placeholder, original)
+            
+        return json_string
+
+
     def generate_problems(self, subject, grade, unit, problem_type, count, difficulty, options=None):
         """AIを使って問題を生成"""
         
@@ -77,10 +107,18 @@ class ProblemGenerator:
                 prompt,
                 generation_config=generation_config
             )
-            problems_data = json.loads(response.text)
+            
+            raw_text = response.text
+            fixed_text = self._fix_json_escapes(raw_text) # 強力な修正関数を呼び出す
+            problems_data = json.loads(fixed_text)       # 修正後のテキストを解析する
+            
             return problems_data
         except Exception as e:
             print(f"AI生成エラー ({type(e).__name__}): {e}")
+            if 'response' in locals() and hasattr(response, 'text'):
+                print("--- 問題が発生したテキスト ---")
+                print(response.text)
+                print("--------------------------")
             return self._generate_fallback_problems(subject, grade, unit, count)
 
     def _build_math_prompt(self, grade, unit, problem_type, count, difficulty, options):
@@ -106,8 +144,18 @@ class ProblemGenerator:
 - 解説は生徒が理解しやすいよう詳しく書く
 - 計算過程も含める
 - "choices"は{problem_type}が「選択問題」の場合のみ含めること。それ以外の場合はnullではなくキー自体を省略すること。
-- JSON文字列内にバックスラッシュ(`\\`)を含める場合は、必ず二重バックスラッシュ(`\\\\`)としてエスケープすること。例: `C:\\\\Users` や `\\\\sqrt{{2}}`
-- 解答解説は「ですます調」ではなく「である調」で書くこと
+- 【最重要ルール】JSONの仕様を厳格に遵守してください。JSON文字列内でバックスラッシュ(`\\`)を1つだけ使用することは絶対に許されません。
+- LaTeX記法などでバックスラッシュを使う場合は、必ずそれ自体をエスケープした二重バックスラッシュ(`\\\\`)を使用してください。
+- 正しい例: `{{"formula": "\\\\sqrt{{2}}"}}`
+- 間違った例: `{{"formula": "\\sqrt{{2}}"}}` (この形式だとJSONエラーになります)
+- 解答解説は「ですます調」ではなく、簡潔な「である調」で記述すること。
+- 解説は、要点を押さえて、可能な限り簡潔に記述すること。計算過程は主要なステップのみを示すこと。
+- pi, theta, sigma, alpha, betaなどの英語はそれぞれの記号（π, θ, Σ, α, β）を使用すること。
+- _barはバー（上線）を意味するので、例えば「x_bar」は「x̄」と表記すること。
+- sqrtは平方根を意味するので、例えば「sqrt(2)」は「√2」と表記すること。
+- べき乗は「^」は使用せず、例えば「x^2」は「x²」と表記すること。
+- 数式はLaTeX記法 (例: \\( ... \\) や $...$) を一切使わず、プレーンテキストと一般的な記号(+, -, *, /, ^)のみで表現すること。
+- 「*」は使わないこと
 """
         
         if grade == "高校2年" and unit in ["微分", "積分"]:
@@ -144,7 +192,9 @@ class ProblemGenerator:
 - 実用的な例文を使用
 - "choices"は{problem_type}が「選択問題」の場合のみ含めること。それ以外の場合はnullではなくキー自体を省略すること。
 - JSON文字列内にバックスラッシュ(`\\`)を含める場合は、必ず二重バックスラッシュ(`\\\\`)としてエスケープすること。
-- 解答解説は「ですます調」ではなく「である調」で書くこと
+- 解答解説は「ですます調」ではなく、簡潔な「である調」で記述すること。
+- 数式はLaTeX記法 (例: \\( ... \\) や $...$) を一切使わず、プレーンテキストと一般的な記号(+, -, *, /, ^)のみで表現すること。
+- 「*」は使わないこと
 """
         
         if options and options.get('vocabulary_list'):

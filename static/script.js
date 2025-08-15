@@ -57,15 +57,26 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // イベントリスナーの設定
 function initializeEventListeners() {
+    // 科目変更時の処理
     elements.subjectSelect.addEventListener('change', handleSubjectChange);
+    
+    // 学年変更時の処理
     elements.gradeSelect.addEventListener('change', handleGradeChange);
+    
+    // フォーム送信の処理
     elements.form.addEventListener('submit', handleFormSubmit);
+    
+    // ボタンクリックの処理
     elements.editBtn.addEventListener('click', openEditModal);
     elements.regenerateBtn.addEventListener('click', handleRegenerate);
     elements.downloadBtn.addEventListener('click', handleDownload);
+    
+    // モーダル関連の処理
     elements.closeModal.addEventListener('click', closeEditModal);
     elements.cancelEditsBtn.addEventListener('click', closeEditModal);
     elements.saveEditsBtn.addEventListener('click', saveEdits);
+    
+    // モーダル背景クリックで閉じる
     elements.editModal.addEventListener('click', function(e) {
         if (e.target === elements.editModal) {
             closeEditModal();
@@ -84,6 +95,7 @@ function handleSubjectChange() {
 // 学年オプション更新
 function updateGradeOptions(subject) {
     elements.gradeSelect.innerHTML = '<option value="">選択してください</option>';
+    
     if (subject && gradeOptions[subject]) {
         gradeOptions[subject].forEach(grade => {
             const option = document.createElement('option');
@@ -104,6 +116,7 @@ function updateVocabularyVisibility() {
 async function handleGradeChange() {
     const subject = elements.subjectSelect.value;
     const grade = elements.gradeSelect.value;
+    
     if (subject && grade) {
         await updateUnitOptions(subject, grade);
     } else {
@@ -115,8 +128,10 @@ async function handleGradeChange() {
 async function updateUnitOptions(subject, grade) {
     try {
         elements.unitSelect.innerHTML = '<option value="">読み込み中...</option>';
+        
         const response = await fetch(`/api/get_units?subject=${subject}&grade=${encodeURIComponent(grade)}`);
         const data = await response.json();
+        
         if (response.ok) {
             elements.unitSelect.innerHTML = '<option value="">選択してください</option>';
             data.units.forEach(unit => {
@@ -143,9 +158,12 @@ function resetUnitSelect() {
 // フォーム送信処理
 async function handleFormSubmit(e) {
     e.preventDefault();
+    
     if (appState.isLoading) return;
+    
     const formData = collectFormData();
     if (!validateFormData(formData)) return;
+    
     appState.setSettings(formData);
     await generateProblems(formData);
 }
@@ -162,33 +180,41 @@ function collectFormData() {
         difficulty: formData.get('difficulty'),
         options: {}
     };
+    
+    // チェックボックスオプション
     if (formData.get('calculationOnly')) {
         data.options.calculation_only = true;
     }
     if (formData.get('wordProblems')) {
         data.options.word_problems = true;
     }
+    
+    // 英語の単語リスト
     const vocabularyList = formData.get('vocabularyList');
     if (vocabularyList && vocabularyList.trim()) {
         data.options.vocabulary_list = vocabularyList.trim();
     }
+    
     return data;
 }
 
 // フォームデータ検証
 function validateFormData(data) {
     const required = ['subject', 'grade', 'unit', 'problemType'];
+    
     for (const field of required) {
         if (!data[field]) {
             showError(`${getFieldDisplayName(field)}を選択してください。`);
             return false;
         }
     }
+    
     const count = parseInt(data.count);
     if (count < 1 || count > 50) {
         showError('問題数は1〜50問の範囲で指定してください。');
         return false;
     }
+    
     return true;
 }
 
@@ -208,12 +234,17 @@ async function generateProblems(data) {
     try {
         showLoading(true);
         hidePreview();
+        
         const response = await fetch('/api/generate_problems', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json'
+            },
             body: JSON.stringify(data)
         });
+        
         const result = await response.json();
+        
         if (response.ok) {
             appState.setProblems(result);
             displayProblems(result);
@@ -251,12 +282,14 @@ function hidePreview() {
 function displayProblems(problemsData) {
     const problems = problemsData.problems || [];
     let html = '';
-    problems.forEach((problem) => {
+    
+    problems.forEach((problem, index) => {
         html += `
             <div class="problem-item" data-problem-id="${problem.id}">
                 <div class="problem-question">
                     <strong>問${problem.id}.</strong> ${escapeHtml(problem.question)}
                 </div>
+                
                 ${problem.choices ? `
                     <div class="problem-choices">
                         ${problem.choices.map((choice, i) => 
@@ -264,9 +297,11 @@ function displayProblems(problemsData) {
                         ).join('')}
                     </div>
                 ` : ''}
+                
                 <div class="problem-answer">
                     <strong>解答:</strong> ${escapeHtml(problem.answer)}
                 </div>
+                
                 ${problem.explanation ? `
                     <div class="problem-explanation">
                         <strong>解説:</strong> ${escapeHtml(problem.explanation)}
@@ -275,14 +310,16 @@ function displayProblems(problemsData) {
             </div>
         `;
     });
+    
     if (html === '') {
         html = '<p>問題が生成されませんでした。設定を確認して再試行してください。</p>';
     }
+    
     elements.problemsPreview.innerHTML = html;
 
     // プレビューエリア内の数式を再レンダリングするようMathJaxに指示
     if (window.MathJax) {
-        MathJax.typesetPromise([elements.problemsPreview]).catch((err) => console.log(err.message));
+        MathJax.typesetPromise([elements.problemsPreview]);
     }
 }
 
@@ -306,17 +343,22 @@ async function handleDownload() {
         showError('ダウンロードできる問題がありません。');
         return;
     }
+    
     try {
         elements.downloadBtn.disabled = true;
         elements.downloadBtn.textContent = 'ダウンロード中...';
+        
         const response = await fetch('/api/generate_pdf', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json'
+            },
             body: JSON.stringify({
                 problems: appState.currentProblems,
                 ...appState.currentSettings
             })
         });
+        
         if (response.ok) {
             const blob = await response.blob();
             const url = window.URL.createObjectURL(blob);
@@ -343,6 +385,7 @@ async function handleDownload() {
 // 編集モーダルを開く
 function openEditModal() {
     if (!appState.currentProblems) return;
+    
     createEditForm();
     elements.editModal.style.display = 'flex';
     document.body.style.overflow = 'hidden';
@@ -352,24 +395,29 @@ function openEditModal() {
 function createEditForm() {
     const problems = appState.currentProblems.problems || [];
     let html = '';
+    
     problems.forEach(problem => {
         html += `
             <div class="editable-problem" data-problem-id="${problem.id}">
                 <h4>問${problem.id}</h4>
+                
                 <div class="form-group">
                     <label>問題文</label>
                     <textarea name="question" rows="3">${escapeHtml(problem.question)}</textarea>
                 </div>
+                
                 ${problem.choices ? `
                     <div class="form-group">
                         <label>選択肢（1行に1つずつ）</label>
                         <textarea name="choices" rows="4">${problem.choices.map(c => escapeHtml(c)).join('\n')}</textarea>
                     </div>
                 ` : ''}
+                
                 <div class="form-group">
                     <label>解答</label>
                     <input type="text" name="answer" value="${escapeHtml(problem.answer)}">
                 </div>
+                
                 <div class="form-group">
                     <label>解説</label>
                     <textarea name="explanation" rows="3">${escapeHtml(problem.explanation || '')}</textarea>
@@ -377,6 +425,7 @@ function createEditForm() {
             </div>
         `;
     });
+    
     elements.editableProblems.innerHTML = html;
 }
 
@@ -384,17 +433,21 @@ function createEditForm() {
 function saveEdits() {
     const editableProblems = elements.editableProblems.querySelectorAll('.editable-problem');
     const updatedProblems = [];
+    
     editableProblems.forEach(problemElement => {
         const problemId = problemElement.dataset.problemId;
         const question = problemElement.querySelector('textarea[name="question"]').value.trim();
         const answer = problemElement.querySelector('input[name="answer"]').value.trim();
         const explanation = problemElement.querySelector('textarea[name="explanation"]').value.trim();
+        
         const problem = {
             id: parseInt(problemId),
             question: question,
             answer: answer,
             explanation: explanation
         };
+        
+        // 選択肢がある場合
         const choicesTextarea = problemElement.querySelector('textarea[name="choices"]');
         if (choicesTextarea) {
             const choicesText = choicesTextarea.value.trim();
@@ -402,11 +455,19 @@ function saveEdits() {
                 problem.choices = choicesText.split('\n').map(c => c.trim()).filter(c => c);
             }
         }
+        
         updatedProblems.push(problem);
     });
+    
+    // 状態を更新
     appState.currentProblems.problems = updatedProblems;
+    
+    // プレビューを更新
     displayProblems(appState.currentProblems);
+    
+    // モーダルを閉じる
     closeEditModal();
+    
     showSuccess('問題を更新しました。');
 }
 
@@ -423,14 +484,24 @@ function showError(message) {
 
 // 成功メッセージ表示
 function showSuccess(message) {
+    // 簡易的な成功メッセージ表示
     const successDiv = document.createElement('div');
     successDiv.textContent = message;
     successDiv.style.cssText = `
-        position: fixed; top: 20px; right: 20px; background: #48bb78; color: white;
-        padding: 15px 20px; border-radius: 8px;
-        box-shadow: 0 4px 15px rgba(72, 187, 120, 0.3); z-index: 1001; font-weight: 500;
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #48bb78;
+        color: white;
+        padding: 15px 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 15px rgba(72, 187, 120, 0.3);
+        z-index: 1001;
+        font-weight: 500;
     `;
+    
     document.body.appendChild(successDiv);
+    
     setTimeout(() => {
         document.body.removeChild(successDiv);
     }, 3000);

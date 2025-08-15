@@ -169,6 +169,7 @@ class ProblemGenerator:
 
 要件：
 - 長文は{grade}のレベルに適した語彙・文法を使用すること。
+- 記述問題の場合、簡潔に答えられる問題にすること。
 - 1個の問題の中に2つ以上の要素を含めないこと。
 - 段落ごとの文章量は、平均して100-150語程度とすること。
 - 全て同じようなジャンルの問題にはしないこと。
@@ -420,7 +421,7 @@ def generate_problems():
             grade=data.get('grade'),
             unit=data.get('unit'),
             problem_type=data.get('problemType'),
-            count=int(data.get('count', 5)),
+            count=int(data.get('count', 3)),
             difficulty=data.get('difficulty', '標準'),
             options=data.get('options')
         )

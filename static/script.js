@@ -45,8 +45,8 @@ const elements = {
 
 // 学年オプション
 const gradeOptions = {
-    math: ['中学1年', '中学2年', '中学3年', '高校1年', '高校2年', '高校3年'],
-    english: ['中学1年', '中学2年', '中学3年', '高校1年', '高校2年', '高校3年']
+    math: ['中学1年', '中学2年', '中学3年', '数学ⅠA', '数学ⅡB', '数学ⅢC'],
+    english: ['中学1年', '中学2年', '中学3年', '高校英文法', '高校英語長文'],
 };
 
 // 初期化
@@ -209,11 +209,12 @@ function validateFormData(data) {
         }
     }
     
-    const count = parseInt(data.count);
-    if (count < 1 || count > 50) {
-        showError('問題数は1〜50問の範囲で指定してください。');
+    const count = parseInt(data.count, 10);
+    if (isNaN(count) || count < 1 || count > 50) {
+        showError('問題数は1〜50の範囲で指定してください。');
         return false;
     }
+
     
     return true;
 }
@@ -265,7 +266,7 @@ function showLoading(show) {
     appState.setLoading(show);
     elements.loadingSection.style.display = show ? 'block' : 'none';
     elements.generateBtn.disabled = show;
-    elements.generateBtn.textContent = show ? '生成中...' : '✨ 問題を生成する';
+    elements.generateBtn.textContent = show ? '生成中...' : '問題を生成する';
 }
 
 // プレビュー表示制御
@@ -278,46 +279,81 @@ function hidePreview() {
     elements.previewSection.style.display = 'none';
 }
 
-// 問題表示
-function displayProblems(problemsData) {
-    const problems = problemsData.problems || [];
+// ▼▼▼ 問題表示関数を修正 ▼▼▼
+function displayProblems(data) {
     let html = '';
-    
-    problems.forEach((problem, index) => {
+
+    // 長文読解形式の場合 (reading_passageキーが存在するかで判定)
+    if (data.reading_passage) {
+        // まず長文を表示
         html += `
-            <div class="problem-item" data-problem-id="${problem.id}">
-                <div class="problem-question">
-                    <strong>問${problem.id}.</strong> ${escapeHtml(problem.question)}
-                </div>
-                
-                ${problem.choices ? `
-                    <div class="problem-choices">
-                        ${problem.choices.map((choice, i) => 
-                            `<div class="problem-choice">(${String.fromCharCode(65 + i)}) ${escapeHtml(choice)}</div>`
-                        ).join('')}
-                    </div>
-                ` : ''}
-                
-                <div class="problem-answer">
-                    <strong>解答:</strong> ${escapeHtml(problem.answer)}
-                </div>
-                
-                ${problem.explanation ? `
-                    <div class="problem-explanation">
-                        <strong>解説:</strong> ${escapeHtml(problem.explanation)}
-                    </div>
-                ` : ''}
+            <div class="reading-passage" style="background-color: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+                <h3 style="font-size: 1.5em; color: #4a5568; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid #667eea;">【長文】</h3>
+                <p style="line-height: 1.8; color: #2d3748;">${escapeHtml(data.reading_passage).replace(/\n/g, '<br>')}</p>
             </div>
         `;
-    });
-    
+        // 次に設問を表示
+        const questions = data.questions || [];
+        questions.forEach((problem) => {
+            html += `
+                <div class="problem-item" data-problem-id="${problem.id}">
+                    <div class="problem-question">
+                        <strong>問${problem.id}.</strong> ${escapeHtml(problem.question)}
+                    </div>
+                    ${problem.choices ? `
+                        <div class="problem-choices">
+                            ${problem.choices.map((choice, i) =>
+                                `<div class="problem-choice">(${String.fromCharCode(65 + i)}) ${escapeHtml(choice)}</div>`
+                            ).join('')}
+                        </div>
+                    ` : ''}
+                    <div class="problem-answer">
+                        <strong>解答:</strong> ${escapeHtml(problem.answer)}
+                    </div>
+                    ${problem.explanation ? `
+                        <div class="problem-explanation">
+                            <strong>解説:</strong> ${escapeHtml(problem.explanation)}
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        });
+    } 
+    // 通常の問題形式の場合
+    else {
+        const problems = data.problems || [];
+        problems.forEach((problem) => {
+            html += `
+                <div class="problem-item" data-problem-id="${problem.id}">
+                    <div class="problem-question">
+                        <strong>問${problem.id}.</strong> ${escapeHtml(problem.question)}
+                    </div>
+                    ${problem.choices ? `
+                        <div class.problem-choices">
+                            ${problem.choices.map((choice, i) =>
+                                `<div class="problem-choice">(${String.fromCharCode(65 + i)}) ${escapeHtml(choice)}</div>`
+                            ).join('')}
+                        </div>
+                    ` : ''}
+                    <div class="problem-answer">
+                        <strong>解答:</strong> ${escapeHtml(problem.answer)}
+                    </div>
+                    ${problem.explanation ? `
+                        <div class="problem-explanation">
+                            <strong>解説:</strong> ${escapeHtml(problem.explanation)}
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        });
+    }
+
     if (html === '') {
         html = '<p>問題が生成されませんでした。設定を確認して再試行してください。</p>';
     }
     
     elements.problemsPreview.innerHTML = html;
 
-    // プレビューエリア内の数式を再レンダリングするようMathJaxに指示
     if (window.MathJax) {
         MathJax.typesetPromise([elements.problemsPreview]);
     }

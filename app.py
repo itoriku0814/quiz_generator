@@ -25,6 +25,7 @@ if not api_key:
     raise ValueError("エラー: 環境変数に GEMINI_API_KEY が設定されていません。")
 
 genai.configure(api_key=api_key)
+# ▼▼▼ ユーザーの指定通り、モデル名を 'gemini-2.5-flash' に設定 ▼▼▼
 model = genai.GenerativeModel('gemini-2.5-flash')
 
 # 日本語フォントの設定
@@ -43,10 +44,10 @@ class ProblemGenerator:
                 'units': {
                     '中学1年': ['正負の数', '文字と式', '一次方程式', '比例・反比例', '平面図形', '空間図形', 'データの活用'],
                     '中学2年': ['式の計算', '連立方程式', '一次関数', '図形の性質', '確率'],
-                    '中学3年': ['多項式', '平方根', '二次方程式', '二次関数', '相似', '円', '三平方の定理'],
-                    '高校1年': ['数と式', '集合と論証', '二次関数', '図形と計量', 'データの分析'],
-                    '高校2年': ['三角関数', '指数・対数関数', '微分', '積分', '数列'],
-                    '高校3年': ['極限', '微分法の応用', '積分法の応用', '複素数平面', '確率分布']
+                    '中学3年': ['展開と因数分解', '平方根', '二次方程式', '二次関数', '相似', '円', '三平方の定理', '標本調査'],
+                    '数学ⅠA': ['数と式', '集合と論証', '二次関数', '図形と計量', 'データの分析', '場合の数と確率', '整数の性質', '平面図形と空間図形'],
+                    '数学ⅡB': ['式と証明', '複素数と方程式', '三角関数', '指数・対数関数', '微分法', '積分法', '数列', '確率分布'],
+                    '数学ⅢC': ['分数関数と無理関数', '極限', '微分法', '微分法の応用', '積分法', '積分法の応用', 'ベクトル', '複素数平面', '二次曲線']
                 }
             },
             'english': {
@@ -54,9 +55,23 @@ class ProblemGenerator:
                     '中学1年': ['be動詞', '一般動詞', '疑問文・否定文', '代名詞', '複数形'],
                     '中学2年': ['過去形', '未来形', '助動詞', '不定詞', '動名詞'],
                     '中学3年': ['現在完了形', '受動態', '関係代名詞', '間接疑問文'],
-                    '高校1年': ['時制', '助動詞', '仮定法', '不定詞・動名詞', '分詞'],
-                    '高校2年': ['関係詞', '比較', '仮定法', '語法'],
-                    '高校3年': ['長文読解', '英作文', '語彙・イディオム', '文法総合']
+                    '高校英文法': [
+                        '時制', 
+                        '助動詞', 
+                        '受動態', 
+                        '不定詞', 
+                        '動名詞', 
+                        '分詞', 
+                        '関係詞', 
+                        '比較', 
+                        '仮定法', 
+                        '接続詞',
+                        '強調・倒置・挿入・省略', 
+                        '一致・話法', 
+                        '否定', 
+                        '文法総合'
+                        ],
+                    '高校英語長文': ['文化', '日常生活', '自然', '科学・技術', '社会', '産業']
                 }
             }
         }
@@ -65,7 +80,6 @@ class ProblemGenerator:
         """
         AIが生成したJSON文字列内の、あらゆる不正なバックスラッシュを修正する。
         """
-        # 保護すべき有効なエスケープシーケンスを一時的にプレースホルダーに置き換える
         valid_escapes = {
             '\\n': '__NEWLINE__',
             '\\"': '__QUOTE__',
@@ -79,11 +93,8 @@ class ProblemGenerator:
         for original, placeholder in valid_escapes.items():
             json_string = json_string.replace(original, placeholder)
         
-        # 保護されていない、残りの不正なバックスラッシュを全て修正する
-        # （例： `\(` は `\\(` になる）
         json_string = json_string.replace('\\', '\\\\')
         
-        # 保護していたプレースホルダーを元の有効なエスケープシーケンスに戻す
         for original, placeholder in valid_escapes.items():
             json_string = json_string.replace(placeholder, original)
             
@@ -93,7 +104,10 @@ class ProblemGenerator:
     def generate_problems(self, subject, grade, unit, problem_type, count, difficulty, options=None):
         """AIを使って問題を生成"""
         
-        if subject == 'math':
+        # ▼▼▼ 条件分岐を修正 ▼▼▼
+        if grade == '高校英語長文':
+            prompt = self._build_english_reading_prompt(grade, unit, count, difficulty)
+        elif subject == 'math':
             prompt = self._build_math_prompt(grade, unit, problem_type, count, difficulty, options)
         else:
             prompt = self._build_english_prompt(grade, unit, problem_type, count, difficulty, options)
@@ -109,8 +123,8 @@ class ProblemGenerator:
             )
             
             raw_text = response.text
-            fixed_text = self._fix_json_escapes(raw_text) # 強力な修正関数を呼び出す
-            problems_data = json.loads(fixed_text)       # 修正後のテキストを解析する
+            fixed_text = self._fix_json_escapes(raw_text)
+            problems_data = json.loads(fixed_text)
             
             return problems_data
         except Exception as e:
@@ -121,10 +135,48 @@ class ProblemGenerator:
                 print("--------------------------")
             return self._generate_fallback_problems(subject, grade, unit, count)
 
+    # ▼▼▼ 長文読解用プロンプト生成関数 ▼▼▼
+    def _build_english_reading_prompt(self, grade, unit, count, difficulty):
+        """高校英語長文問題生成用プロンプト"""
+        return f"""
+高校生レベルの英語長文を1つ生成してください。長文のトピックは「{unit}」に関連するものとします。
+その後、その長文の内容に関する問題を{count}問作成してください。
+
+難易度は「{difficulty}」で、問題形式は内容理解を問う選択式や記述式などをバランス良く含めてください。
+
+以下の形式でJSONで回答してください：
+{{
+  "reading_passage": "生成した英語長文",
+  "questions": [
+    {{
+      "id": 1,
+      "question": "設問文",
+      "choices": ["選択肢1", "選択肢2", "選択肢3", "選択肢4"],
+      "answer": "正解",
+      "explanation": "詳しい解説"
+    }}
+  ]
+}}
+
+要件：
+- 長文は{grade}のレベルに適した語彙・文法を使用すること。
+- `questions`配列には、必ず{count}個の問題オブジェクトを含めること。
+- 設問は長文の内容に関するものにすること。
+- "choices"は選択問題の場合のみ含めること。
+- 解説は「である調」で、簡潔に記述すること。
+- 数式はLaTeX記法 (例: \\( ... \\) や $...$) を一切使わず、プレーンテキストと一般的な記号(+, -, *, /, ^)のみで表現すること。
+"""
+
     def _build_math_prompt(self, grade, unit, problem_type, count, difficulty, options):
         """数学問題生成用プロンプト"""
+
+        if problem_type == "おまかせ (ミックス)":
+            task_instruction = f"{grade}の数学「{unit}」に関する問題を、選択問題、穴埋め問題、記述問題をバランス良く組み合わせて合計{count}問作成してください。"
+        else:
+            task_instruction = f"{grade}の数学「{unit}」に関する{problem_type}を{count}問作成してください。"
+
         base_prompt = f"""
-{grade}の数学「{unit}」に関する{problem_type}を{count}問作成してください。
+    {task_instruction}
 
 以下の形式でJSONで回答してください：
 {{
@@ -151,14 +203,14 @@ class ProblemGenerator:
 - 解答解説は「ですます調」ではなく、簡潔な「である調」で記述すること。
 - 解説は、要点を押さえて、可能な限り簡潔に記述すること。計算過程は主要なステップのみを示すこと。
 - pi, theta, sigma, alpha, betaなどの英語はそれぞれの記号（π, θ, Σ, α, β）を使用すること。
-- _barはバー（上線）を意味するので、例えば「x_bar」は「x̄」と表記すること。
+- _barはバー（上線）を意味するので、例えば「x_bar」は「x_」と表記すること。
 - sqrtは平方根を意味するので、例えば「sqrt(2)」は「√2」と表記すること。
 - べき乗は「^」は使用せず、例えば「x^2」は「x²」と表記すること。
 - 数式はLaTeX記法 (例: \\( ... \\) や $...$) を一切使わず、プレーンテキストと一般的な記号(+, -, *, /, ^)のみで表現すること。
 - 「*」は使わないこと
 """
         
-        if grade == "高校2年" and unit in ["微分", "積分"]:
+        if grade == "数学ⅡB" and unit in ["微分法", "積分法"]:
             base_prompt += "\n- 重要：必ず数学Ⅱの範囲（多項式関数の微分・積分）のみで問題を作成してください。数学Ⅲで扱う関数（三角関数、指数関数、対数関数など）の微分・積分は絶対に含めないでください。"
 
         if options and options.get('calculation_only'):
@@ -187,9 +239,11 @@ class ProblemGenerator:
 }}
 
 要件：
-- 問題は{grade}のレベルに適した語彙・文法を使用し、難易度は「{difficulty}」とすること
+- 難易度は「{difficulty}」とすること
 - 解説では文法ポイントも詳しく説明
 - 実用的な例文を使用
+- 全て同じようなジャンルの問題にはしないこと。
+- 問題文は日本語で書くこと
 - "choices"は{problem_type}が「選択問題」の場合のみ含めること。それ以外の場合はnullではなくキー自体を省略すること。
 - JSON文字列内にバックスラッシュ(`\\`)を含める場合は、必ず二重バックスラッシュ(`\\\\`)としてエスケープすること。
 - 解答解説は「ですます調」ではなく、簡潔な「である調」で記述すること。
@@ -246,6 +300,11 @@ class PDFGenerator:
             'Answer', parent=self.styles['Normal'], fontName=FONT_NAME,
             fontSize=11, spaceAfter=15, leftIndent=20, textColor=colors.blue
         )
+        # ▼▼▼ 長文用のスタイルを追加 ▼▼▼
+        self.passage_style = ParagraphStyle(
+            'Passage', parent=self.styles['Normal'], fontName=FONT_NAME,
+            fontSize=12, spaceAfter=15, leftIndent=10, leading=16
+        )
 
     def generate_pdf(self, problems_data, subject, grade, unit):
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
@@ -259,26 +318,60 @@ class PDFGenerator:
         title = f"{subject.upper()} - {grade} - {unit}"
         story.append(Paragraph(title, self.title_style))
         story.append(Spacer(1, 20))
-        story.append(Paragraph("【問題】", self.title_style))
         
-        for problem in problems_data.get('problems', []):
-            question_text = f"問{problem['id']}. {problem['question']}"
-            story.append(Paragraph(question_text, self.question_style))
-            if 'choices' in problem and problem['choices']:
-                for i, choice in enumerate(problem['choices']):
-                    choice_text = f"({chr(65+i)}) {choice}"
-                    story.append(Paragraph(choice_text, self.question_style))
+        # ▼▼▼ PDF生成ロジックを修正 ▼▼▼
+        # 長文形式の場合
+        if 'reading_passage' in problems_data:
+            story.append(Paragraph("【長文】", self.title_style))
+            passage_text = problems_data['reading_passage'].replace('\n', '<br/>')
+            story.append(Paragraph(passage_text, self.passage_style))
             story.append(Spacer(1, 15))
+            
+            story.append(Paragraph("【問題】", self.title_style))
+            question_list = problems_data.get('questions', [])
+            
+            for problem in question_list:
+                question_text = f"問{problem['id']}. {problem['question']}"
+                story.append(Paragraph(question_text, self.question_style))
+                if 'choices' in problem and problem['choices']:
+                    for i, choice in enumerate(problem['choices']):
+                        choice_text = f"({chr(65+i)}) {choice}"
+                        story.append(Paragraph(choice_text, self.question_style))
+                story.append(Spacer(1, 15))
+            
+            story.append(PageBreak())
+            story.append(Paragraph("【解答・解説】", self.title_style))
+            
+            for problem in question_list:
+                answer_text = f"問{problem['id']}. 解答: {problem['answer']}"
+                story.append(Paragraph(answer_text, self.answer_style))
+                explanation_text = f"解説: {problem.get('explanation', '解説はありません。')}"
+                story.append(Paragraph(explanation_text, self.question_style))
+                story.append(Spacer(1, 20))
         
-        story.append(PageBreak())
-        story.append(Paragraph("【解答・解説】", self.title_style))
-        
-        for problem in problems_data.get('problems', []):
-            answer_text = f"問{problem['id']}. 解答: {problem['answer']}"
-            story.append(Paragraph(answer_text, self.answer_style))
-            explanation_text = f"解説: {problem.get('explanation', '解説はありません。')}"
-            story.append(Paragraph(explanation_text, self.question_style))
-            story.append(Spacer(1, 20))
+        # 通常形式の場合
+        else:
+            story.append(Paragraph("【問題】", self.title_style))
+            problem_list = problems_data.get('problems', [])
+
+            for problem in problem_list:
+                question_text = f"問{problem['id']}. {problem['question']}"
+                story.append(Paragraph(question_text, self.question_style))
+                if 'choices' in problem and problem['choices']:
+                    for i, choice in enumerate(problem['choices']):
+                        choice_text = f"({chr(65+i)}) {choice}"
+                        story.append(Paragraph(choice_text, self.question_style))
+                story.append(Spacer(1, 15))
+            
+            story.append(PageBreak())
+            story.append(Paragraph("【解答・解説】", self.title_style))
+            
+            for problem in problem_list:
+                answer_text = f"問{problem['id']}. 解答: {problem['answer']}"
+                story.append(Paragraph(answer_text, self.answer_style))
+                explanation_text = f"解説: {problem.get('explanation', '解説はありません。')}"
+                story.append(Paragraph(explanation_text, self.question_style))
+                story.append(Spacer(1, 20))
         
         doc.build(story)
         return temp_filename

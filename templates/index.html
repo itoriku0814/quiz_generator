@@ -50,17 +50,13 @@
                             <option value="選択問題">選択問題</option>
                             <option value="穴埋め問題">穴埋め問題</option>
                             <option value="記述問題">記述問題</option>
+                            <option value="おまかせ (ミックス)">おまかせ (ミックス)</option>
                         </select>
                     </div>
 
                     <div class="form-group">
                         <label for="count">問題数</label>
-                        <select id="count" name="count">
-                            <option value="5">5問</option>
-                            <option value="10" selected>10問</option>
-                            <option value="15">15問</option>
-                            <option value="20">20問</option>
-                        </select>
+                        <input type="number" id="count" name="count" class="form-control" value="10" min="1" max="50" required>
                     </div>
 
                     <div class="form-group">

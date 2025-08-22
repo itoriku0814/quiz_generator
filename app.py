@@ -26,8 +26,10 @@ if not api_key:
 
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel('gemini-2.5-flash')
+# 2.5 flashの場合、(RPM, TPM, RPD)=(10, 250000, 250)
+# 2.5 proの場合、(RPM, TPM, RPD)=(5, 250000, 100)
 
-# 日本語フォントと数学フォントの設定
+#フォントの設定
 try:
     pdfmetrics.registerFont(TTFont('NotoSansCJK', 'NotoSansJP-Regular.ttf'))
     pdfmetrics.registerFont(TTFont('DejaVu', 'DejaVuSans.ttf'))
@@ -71,6 +73,9 @@ class ProblemGenerator:
                         '一致・話法', 
                         '否定構文',
                         '名詞構文' ,
+                        '無生物主語構文',
+                        '前置詞',
+                        '語法',
                         '文法総合'
                         ],
                     '高校英語長文': ['文化', '日常生活', '自然', '科学・技術', '社会', '産業', '歴史', '環境', '教育', '健康', '国際問題']
@@ -154,7 +159,8 @@ class ProblemGenerator:
 
         # ▼▼▼ プロンプトの指示を強化 ▼▼▼
         return f"""
-あなたは英語教育のプロフェッショナルです。以下の指示に厳密に従って、高品質な英語長文問題を作成してください。
+
+あなたは予備校の英語の講師です。以下の指示に厳密に従って、高品質な英語長文問題を作成してください。
 
 【最重要指示】
 これから生成する英語長文は、必ず、厳密に {paragraph_count} 個の段落で構成してください。これより多くても少なくても絶対に不可です。
@@ -482,7 +488,7 @@ def generate_problems():
             problem_type=data.get('problemType'),
             count=int(data.get('count', 3)),
             difficulty=data.get('difficulty', '標準'),
-            options=data # ▼▼▼ ここを修正: data全体をoptionsとして渡す ▼▼▼
+            options=data 
         )
         return jsonify(problems)
     except Exception as e:

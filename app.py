@@ -27,10 +27,12 @@ if not api_key:
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel('gemini-2.5-flash')
 
-# 日本語フォントの設定
+# 日本語フォントと数学フォントの設定
 try:
     pdfmetrics.registerFont(TTFont('NotoSansCJK', 'NotoSansJP-Regular.ttf'))
+    pdfmetrics.registerFont(TTFont('DejaVu', 'DejaVuSans.ttf'))
     FONT_NAME = 'NotoSansCJK'
+
 except Exception as e:
     print(f"フォント読み込みエラー: {e}")
     print("日本語フォントが読み込めないため、英語フォント(Helvetica)にフォールバックします。文字化けする可能性があります。")
@@ -71,7 +73,7 @@ class ProblemGenerator:
                         '名詞構文' ,
                         '文法総合'
                         ],
-                    '高校英語長文': ['文化', '日常生活', '自然', '科学・技術', '社会', '産業', '歴史', '環境', '教育', '健康', '国際問題', '文学']
+                    '高校英語長文': ['文化', '日常生活', '自然', '科学・技術', '社会', '産業', '歴史', '環境', '教育', '健康', '国際問題']
                 }
             }
         }
@@ -105,20 +107,18 @@ class ProblemGenerator:
         """AIを使って問題を生成"""
         
         if grade == '高校英語長文':
-            # optionsからparagraph_countを取得、デフォルトは3
-            paragraph_count = options.get('paragraphCount', 3) if options else 3
+            paragraph_count = options.get('paragraphCount', '3') if options else '3'
             prompt = self._build_english_reading_prompt(
                 grade=grade,
                 unit=unit,
                 problem_type=problem_type,
                 count=count,
                 difficulty=difficulty,
-                paragraph_count=paragraph_count  # ここで段落数を渡す
+                paragraph_count=paragraph_count
             )
         elif subject == 'math':
             prompt = self._build_math_prompt(grade, unit, problem_type, count, difficulty, options)
         else:
-            # 「高校英文法」など、上記以外の英語の問題
             prompt = self._build_english_prompt(grade, unit, problem_type, count, difficulty, options)
         
         generation_config = genai.types.GenerationConfig(
@@ -144,23 +144,24 @@ class ProblemGenerator:
                 print("--------------------------")
             return self._generate_fallback_problems(subject, grade, unit, count)
 
-    # ▼▼▼ 長文読解用プロンプト生成関数 ▼▼▼
-    # ▼▼▼ 関数の引数に problem_type を追加 ▼▼▼
     def _build_english_reading_prompt(self, grade, unit, problem_type, count, difficulty, paragraph_count=None):
         """高校英語長文問題生成用プロンプト"""
 
-        # ▼▼▼ 指示文を動的に生成するロジックを追加 ▼▼▼
         if problem_type == "おまかせ (ミックス)":
             task_instruction = f"そして、その長文の内容に関する問題を、選択問題、穴埋め問題、記述問題をバランス良く組み合わせて合計{count}問作成してください。"
         else:
             task_instruction = f"そして、その長文の内容に関する{problem_type}を{count}問作成してください。"
 
+        # ▼▼▼ プロンプトの指示を強化 ▼▼▼
         return f"""
-【最重要】
-高校生レベルの英語長文を1つ、必ず{paragraph_count}段落で生成してください。これより多くても少なくても不可です。
-長文のトピックは「{unit}」に関連するものとします。
+あなたは英語教育のプロフェッショナルです。以下の指示に厳密に従って、高品質な英語長文問題を作成してください。
 
-{task_instruction}
+【最重要指示】
+これから生成する英語長文は、必ず、厳密に {paragraph_count} 個の段落で構成してください。これより多くても少なくても絶対に不可です。
+
+【タスク】
+1. トピックが「{unit}」に関連する、高校生レベルの英語長文を1つ、上記の段落数厳守で生成します。
+2. {task_instruction}
 
 難易度は「{difficulty}」でお願いします。
 
@@ -178,7 +179,7 @@ class ProblemGenerator:
   ]
 }}
 
-要件：
+【詳細な要件】
 - 長文は{difficulty}, {grade}のレベルに適した語彙・文法を使用すること。
 - {difficulty}が「基礎」の場合、英検3級から英検準2級レベルの語彙・文法を使用し、英語コミュニケーションの教科書レベルの問題を作成すること。
 - {difficulty}が「標準」の場合、英検準2級から英検2級レベルの語彙・文法を使用し、英語コミュニケーションの教科書レベルの問題を作成すること。
@@ -238,11 +239,12 @@ class ProblemGenerator:
 - _barはバー（上線）を意味するので、例えば「x_bar」は「x_」と表記すること。
 - sqrtは平方根を意味するので、例えば「sqrt(2)」は「√2」と表記すること。
 - ネイピア数は「e」と表記すること。expの使用は禁止。
-- べき乗は「^」は使用せず、例えば「x^2」は「x²」と表記すること。
 - {unit}が積分法の場合、不定積分と定積分の計算問題のみを出題すること。面積や体積の問題は出題禁止。
 - 三角関数の積分問題を出題する場合は、逆関数（arcsinなど）を扱う問題は出題禁止。
 - 数学ⅡBと数学ⅢCの積分法の定積分の表記方法は、必ず「∫[a→b]f(x) dx」の形式で記述すること。
 - 自然対数は必ず「log(x)」と表記すること。
+- 【最重要ルール】下付き文字や上付き文字は、Unicode文字（例: ₂, ²）を使わず、必ずHTMLタグ（例: log<sub>2</sub>(x), x<sup>2</sup>）を使って表現すること。
+- 掛け算を表す記号「⋅」は、必ず <font name="DejaVu">⋅</font> のようにフォントタグで囲んでください。
 - 数式はLaTeX記法 (例: \\( ... \\) や $...$) を一切使わず、プレーンテキストと一般的な記号(+, -, *, /, ^)のみで表現すること。
 - 「*」、「\」は使わないこと
 """
@@ -260,7 +262,6 @@ class ProblemGenerator:
     def _build_english_prompt(self, grade, unit, problem_type, count, difficulty, options):
         """英文法問題生成用プロンプト"""
 
-        # ▼▼▼ 指示文を動的に生成するロジックを追加 ▼▼▼
         if problem_type == "おまかせ (ミックス)":
             task_instruction = f"{grade}の英語「{unit}」に関する問題を、選択問題、穴埋め問題、記述問題をバランス良く組み合わせて合計{count}問作成してください。"
         else:
@@ -352,10 +353,18 @@ class PDFGenerator:
             'Answer', parent=self.styles['Normal'], fontName=FONT_NAME,
             fontSize=11, spaceAfter=15, leftIndent=20, textColor=colors.blue
         )
-        # ▼▼▼ 長文用のスタイルを追加 ▼▼▼
         self.passage_style = ParagraphStyle(
             'Passage', parent=self.styles['Normal'], fontName=FONT_NAME,
             fontSize=12, spaceAfter=15, leftIndent=10, leading=16
+        )
+
+        self.explanation_style = ParagraphStyle(
+            'Explanation',
+            parent=self.styles['Normal'],
+            fontName=FONT_NAME,
+            fontSize=11,          # 解説文のフォントサイズを少し小さく
+            leftIndent=20,        # 解答とインデントを合わせる
+            leading=20            # 行間を広げる
         )
 
     def generate_pdf(self, problems_data, subject, grade, unit):
@@ -371,8 +380,6 @@ class PDFGenerator:
         story.append(Paragraph(title, self.title_style))
         story.append(Spacer(1, 20))
         
-        # ▼▼▼ PDF生成ロジックを修正 ▼▼▼
-        # 長文形式の場合
         if 'reading_passage' in problems_data:
             story.append(Paragraph("【長文】", self.title_style))
             passage_text = problems_data['reading_passage'].replace('\n', '<br/>')
@@ -398,10 +405,9 @@ class PDFGenerator:
                 answer_text = f"問{problem['id']}. 解答: {problem['answer']}"
                 story.append(Paragraph(answer_text, self.answer_style))
                 explanation_text = f"解説: {problem.get('explanation', '解説はありません。')}"
-                story.append(Paragraph(explanation_text, self.question_style))
+                story.append(Paragraph(explanation_text, self.explanation_style)) # スタイルを変更
                 story.append(Spacer(1, 20))
         
-        # 通常形式の場合
         else:
             story.append(Paragraph("【問題】", self.title_style))
             problem_list = problems_data.get('problems', [])
@@ -422,7 +428,7 @@ class PDFGenerator:
                 answer_text = f"問{problem['id']}. 解答: {problem['answer']}"
                 story.append(Paragraph(answer_text, self.answer_style))
                 explanation_text = f"解説: {problem.get('explanation', '解説はありません。')}"
-                story.append(Paragraph(explanation_text, self.question_style))
+                story.append(Paragraph(explanation_text, self.explanation_style)) # スタイルを変更
                 story.append(Spacer(1, 20))
         
         doc.build(story)
@@ -455,7 +461,7 @@ def generate_problems():
             problem_type=data.get('problemType'),
             count=int(data.get('count', 3)),
             difficulty=data.get('difficulty', '標準'),
-            options=data.get('options')
+            options=data # ▼▼▼ ここを修正: data全体をoptionsとして渡す ▼▼▼
         )
         return jsonify(problems)
     except Exception as e:

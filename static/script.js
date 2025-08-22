@@ -42,7 +42,6 @@ const elements = {
     saveEditsBtn: document.getElementById('saveEditsBtn'),
     cancelEditsBtn: document.getElementById('cancelEditsBtn'),
     paragraphCountGroup: document.getElementById('paragraphCountGroup'),
-    generateBtn: document.getElementById('generateBtn'),
 };
 
 // 学年オプション
@@ -299,7 +298,7 @@ function hidePreview() {
     elements.previewSection.style.display = 'none';
 }
 
-// ▼▼▼ 問題表示関数を修正 ▼▼▼
+// ▼▼▼ 問題表示関数（修正済み） ▼▼▼
 function displayProblems(data) {
     let html = '';
 
@@ -309,7 +308,7 @@ function displayProblems(data) {
         html += `
             <div class="reading-passage" style="background-color: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
                 <h3 style="font-size: 1.5em; color: #4a5568; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid #667eea;">【長文】</h3>
-                <p style="line-height: 1.8; color: #2d3748;">${escapeHtml(data.reading_passage).replace(/\n/g, '<br>')}</p>
+                <p style="line-height: 1.8; color: #2d3748;">${data.reading_passage.replace(/\n/g, '<br>')}</p>
             </div>
         `;
         // 次に設問を表示
@@ -318,7 +317,7 @@ function displayProblems(data) {
             html += `
                 <div class="problem-item" data-problem-id="${problem.id}">
                     <div class="problem-question">
-                        <strong>問${problem.id}.</strong> ${escapeHtml(problem.question)}
+                        <strong>問${problem.id}.</strong> ${problem.question}
                     </div>
                     ${problem.choices ? `
                         <div class="problem-choices">
@@ -328,11 +327,11 @@ function displayProblems(data) {
                         </div>
                     ` : ''}
                     <div class="problem-answer">
-                        <strong>解答:</strong> ${escapeHtml(problem.answer)}
+                        <strong>解答:</strong> ${problem.answer}
                     </div>
                     ${problem.explanation ? `
                         <div class="problem-explanation">
-                            <strong>解説:</strong> ${escapeHtml(problem.explanation)}
+                            <strong>解説:</strong> ${problem.explanation}
                         </div>
                     ` : ''}
                 </div>
@@ -346,21 +345,21 @@ function displayProblems(data) {
             html += `
                 <div class="problem-item" data-problem-id="${problem.id}">
                     <div class="problem-question">
-                        <strong>問${problem.id}.</strong> ${escapeHtml(problem.question)}
+                        <strong>問${problem.id}.</strong> ${problem.question}
                     </div>
                     ${problem.choices ? `
-                        <div class.problem-choices">
+                        <div class="problem-choices">
                             ${problem.choices.map((choice, i) =>
                                 `<div class="problem-choice">(${String.fromCharCode(65 + i)}) ${escapeHtml(choice)}</div>`
                             ).join('')}
                         </div>
                     ` : ''}
                     <div class="problem-answer">
-                        <strong>解答:</strong> ${escapeHtml(problem.answer)}
+                        <strong>解答:</strong> ${problem.answer}
                     </div>
                     ${problem.explanation ? `
                         <div class="problem-explanation">
-                            <strong>解説:</strong> ${escapeHtml(problem.explanation)}
+                            <strong>解説:</strong> ${problem.explanation}
                         </div>
                     ` : ''}
                 </div>

@@ -254,6 +254,7 @@ class ProblemGenerator:
 
         if options and options.get('calculation_only'):
             base_prompt += "\n- 計算問題のみを出題する"
+
         if options and options.get('word_problems'):
             base_prompt += "\n- 文章問題も含める"
             
@@ -410,11 +411,11 @@ class PDFGenerator:
             question_list = problems_data.get('questions', [])
             
             for problem in question_list:
-                question_text = f"問{problem['id']}. {problem['question']}"
+                question_text = f"問{problem['id']}. {problem['question']}".replace('<br>', '<br/>')
                 story.append(Paragraph(question_text, self.question_style))
                 if 'choices' in problem and problem['choices']:
                     for i, choice in enumerate(problem['choices']):
-                        choice_text = f"({chr(65+i)}) {choice}"
+                        choice_text = f"({chr(65+i)}) {choice}".replace('<br>', '<br/>')
                         story.append(Paragraph(choice_text, self.question_style))
                 story.append(Spacer(1, 15))
             
@@ -424,7 +425,7 @@ class PDFGenerator:
             for problem in question_list:
                 answer_text = f"問{problem['id']}. 解答: {problem['answer']}"
                 story.append(Paragraph(answer_text, self.answer_style))
-                explanation_text = f"解説: {problem.get('explanation', '解説はありません。')}"
+                explanation_text = f"解説: {problem.get('explanation', '解説はありません。')}".replace('<br>', '<br/>')
                 story.append(Paragraph(explanation_text, self.explanation_style)) # スタイルを変更
                 story.append(Spacer(1, 20))
         
@@ -437,7 +438,7 @@ class PDFGenerator:
                 story.append(Paragraph(question_text, self.question_style))
                 if 'choices' in problem and problem['choices']:
                     for i, choice in enumerate(problem['choices']):
-                        choice_text = f"({chr(65+i)}) {choice}"
+                        choice_text = f"({chr(65+i)}) {choice}".replace('<br>', '<br/>')
                         story.append(Paragraph(choice_text, self.question_style))
                 story.append(Spacer(1, 15))
             
@@ -447,7 +448,7 @@ class PDFGenerator:
             for problem in problem_list:
                 answer_text = f"問{problem['id']}. 解答: {problem['answer']}"
                 story.append(Paragraph(answer_text, self.answer_style))
-                explanation_text = f"解説: {problem.get('explanation', '解説はありません。')}"
+                explanation_text = f"解説: {problem.get('explanation', '解説はありません。')}".replace('<br>', '<br/>')
                 story.append(Paragraph(explanation_text, self.explanation_style)) # スタイルを変更
                 story.append(Spacer(1, 20))
         

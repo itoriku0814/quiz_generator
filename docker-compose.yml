@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  web:
+    # Dockerfileがある場所を指定してビルド
+    build: .
+    # ポートのマッピング (ホストPCの5001番ポートをコンテナの8000番に接続)
+    ports:
+      - "5001:8000"
+    # .envファイルから環境変数を読み込む
+    env_file:
+      - .env

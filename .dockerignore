@@ -1,0 +1,17 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# IDE / Editor specific
+.vscode/
+.idea/
+
+# Git folder
+.git
+
+# Environment files (handled by docker-compose)
+.env
